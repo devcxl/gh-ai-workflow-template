@@ -23,6 +23,7 @@ jobs:
         uses: anomalyco/opencode/github@latest
         with:
           model: half-cabbage/deepseek-v4-flash
+          share: false
           prompt: |
             你是一个资深架构师。
             请分析 Issue #${ISSUE_NUMBER}中的功能请求。
