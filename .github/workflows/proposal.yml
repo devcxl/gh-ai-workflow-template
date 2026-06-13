@@ -31,5 +31,13 @@ jobs:
           HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          opencode github run "你是一个资深架构师。请分析 Issue #${ISSUE_NUMBER} 的功能请求。使用 'gh issue view ${ISSUE_NUMBER}' 获取 issue 内容。检查现有的 app/ 和 tests/ 代码了解项目结构。生成实现方案包含需求分析、技术方案与变更清单、需要修改/新增的文件、测试策略。方案用中文回复。" 
+        uses: anomalyco/opencode/github@latest
+        with:
+          model: half-cabbage/deepseek-v4-flash
+          prompt: |
+            你是一个资深架构师。
+            请分析 Issue #${ISSUE_NUMBER} 的功能请求。
+            使用 'gh issue view ${ISSUE_NUMBER}' 获取 issue 内容。
+            检查现有的 app/ 和 tests/ 代码了解项目结构。
+            生成实现方案包含需求分析、技术方案与变更清单、需要修改/新增的文件、测试策略。方案.
+            用中文回复。
