@@ -1,0 +1,7 @@
+{
+  "model": "auto",
+  "agent": "auto",
+  "rules": [
+    ".opencode/rules/tdd.md"
+  ]
+}
