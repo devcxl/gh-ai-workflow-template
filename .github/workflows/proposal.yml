@@ -16,23 +16,14 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-    if: github.event.issue.state == 'open'
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt pytest httpx
-
+          persist-credentials: false
       - name: Post plan to issue
         env:
           HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
         uses: anomalyco/opencode/github@latest
         with:
           model: half-cabbage/deepseek-v4-flash
