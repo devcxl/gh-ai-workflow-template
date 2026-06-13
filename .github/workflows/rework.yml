@@ -1,0 +1,55 @@
+name: AI 修改
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  rework:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.review.state == 'changes_requested'
+      && github.event.review.user.login == github.repository_owner
+      && startsWith(github.event.pull_request.head.ref, 'feat/issue-')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest httpx PyGithub
+
+      - name: Setup opencode
+        run: npm install -g @opencode-ai/cli
+
+      - name: Save review body to file
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+        run: |
+          cat > /tmp/review_body.txt << 'REVIEWEOF'
+          ${{ github.event.review.body }}
+          REVIEWEOF
+
+      - name: Apply review changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_URL: ${{ github.event.pull_request.html_url }}
+          REPO: ${{ github.repository }}
+          TDD_MODE: rework
+          MAX_ITERATIONS: 5
+          TIMEOUT_MINUTES: 20
+        run: python scripts/tdd_loop.py

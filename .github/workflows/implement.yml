@@ -1,0 +1,47 @@
+name: AI 实现
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.issue.pull_request == null
+      && github.event.comment.body == '/approve'
+      && github.event.comment.user.login == github.repository_owner
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest httpx PyGithub
+
+      - name: Setup opencode
+        run: npm install -g @opencode-ai/cli
+
+      - name: Run TDD loop
+        id: tdd
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          REPO: ${{ github.repository }}
+          TDD_MODE: initial
+          MAX_ITERATIONS: 10
+          TIMEOUT_MINUTES: 30
+        run: python scripts/tdd_loop.py

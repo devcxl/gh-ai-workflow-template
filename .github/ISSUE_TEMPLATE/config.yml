@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 提问 / 讨论
+    url: https://github.com/devcxl/gh-ai-workflow-template/discussions
+    about: 如果不是 Bug 或功能建议，请在 Discussions 中提问
