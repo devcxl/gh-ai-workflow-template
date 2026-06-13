@@ -41,6 +41,7 @@ jobs:
 
       - name: Run opencode to implement
         env:
+          HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
