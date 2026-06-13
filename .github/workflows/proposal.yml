@@ -11,6 +11,11 @@ permissions:
 jobs:
   propose:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
     if: github.event.issue.state == 'open'
     steps:
       - uses: actions/checkout@v4
@@ -22,9 +27,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt pytest httpx
-
-      - name: Setup opencode
-        run: curl -fsSL https://opencode.ai/install | bash
 
       - name: Post plan to issue
         env:
