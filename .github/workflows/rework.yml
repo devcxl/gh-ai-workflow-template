@@ -12,6 +12,7 @@ on:
         type: string
 
 permissions:
+  id-token: write
   contents: write
   pull-requests: write
 
@@ -32,9 +33,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt pytest httpx
-
-      - name: Setup opencode
-        run: curl -fsSL https://opencode.ai/install | bash
 
       - name: Read iteration count from PR
         id: iteration
@@ -64,16 +62,28 @@ jobs:
           echo "Max rework iterations reached"
           exit 1
 
-      - name: Save test output for opencode
+      - name: Decode test output
+        id: test
         run: |
-          echo "${{ inputs.test_output }}" | base64 -d > /tmp/test_output.txt
+          {
+            echo 'output<<OPEOF'
+            echo "${{ inputs.test_output }}" | base64 -d
+            echo 'OPEOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run opencode to fix
+        uses: anomalyco/opencode/github@latest
         env:
-          HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
-        run: |
-          opencode run "The tests are failing. Read the test output at /tmp/test_output.txt and fix the code in app/ to make all tests pass. Do NOT modify test files. Do NOT modify .github/workflows files." \
-            -f /tmp/test_output.txt
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        with:
+          model: opencode-go/deepseek-v4-flash
+          share: false
+          prompt: |
+            The tests are failing. Here is the test output:
+
+            ${{ steps.test.outputs.output }}
+
+            Fix the code in app/ to make all tests pass. Do NOT modify test files. Do NOT modify .github/workflows files.
 
       - name: Commit and push
         run: |

@@ -4,6 +4,7 @@ on:
     types: [created]
 
 permissions:
+  id-token: write
   contents: write
   issues: write
   pull-requests: write
@@ -30,9 +31,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest httpx
 
-      - name: Setup opencode
-        run: curl -fsSL https://opencode.ai/install | bash
-
       - name: Create feature branch
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -40,12 +38,17 @@ jobs:
           git checkout -b "feat/issue-${ISSUE_NUMBER}"
 
       - name: Run opencode to implement
+        uses: anomalyco/opencode/github@latest
         env:
-          HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          opencode run "You are implementing Issue #${ISSUE_NUMBER}. Use 'gh issue view ${ISSUE_NUMBER}' to read the issue context. Write tests in tests/ using pytest + TestClient, then implement the feature in app/ to make all tests pass. Do NOT modify .github/workflows files."
+        with:
+          model: opencode-go/deepseek-v4-flash
+          share: false
+          use_github_token: true
+          prompt: |
+            You are implementing Issue #${ISSUE_NUMBER}. Use 'gh issue view ${ISSUE_NUMBER}' to read the issue context. Write tests in tests/ using pytest + TestClient, then implement the feature in app/ to make all tests pass. Do NOT modify .github/workflows files.
 
       - name: Commit and push
         env:
@@ -69,5 +72,3 @@ jobs:
             --head "feat/issue-${ISSUE_NUMBER}" \
             --body "Closes #${ISSUE_NUMBER}" \
             --draft
-
-
