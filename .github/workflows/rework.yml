@@ -72,8 +72,7 @@ jobs:
         env:
           HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
         run: |
-          opencode run \
-            --goal "The tests are failing. Read the test output at /tmp/test_output.txt and fix the code in app/ to make all tests pass. Do NOT modify test files. Do NOT modify .github/workflows files." \
+          opencode run "The tests are failing. Read the test output at /tmp/test_output.txt and fix the code in app/ to make all tests pass. Do NOT modify test files. Do NOT modify .github/workflows files." \
             --context "file:///tmp/test_output.txt"
 
       - name: Commit and push
