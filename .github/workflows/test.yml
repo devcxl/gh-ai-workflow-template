@@ -1,5 +1,11 @@
-name: 测试运行
+name: Test
 on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to test
+        required: true
+        type: string
   push:
     branches:
       - 'feat/issue-*'
@@ -14,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -28,26 +36,25 @@ jobs:
         continue-on-error: true
         run: python -m pytest tests/ -v --tb=short 2>&1 | tee pytest_output.txt
 
+      - name: Check test result
+        id: check
+        if: always()
+        run: |
+          if grep -q "passed" pytest_output.txt && ! grep -q "FAILED" pytest_output.txt; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
       - name: Update commit status
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if grep -q "passed" pytest_output.txt && ! grep -q "FAILED" pytest_output.txt; then
-            STATE="success"
-            DESC="all tests passed"
-          elif grep -q "FAILED" pytest_output.txt; then
-            STATE="failure"
-            DESC="some tests failed"
-          else
-            STATE="failure"
-            DESC="test run error"
-          fi
-          curl -L -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d "{\"state\":\"${STATE}\",\"description\":\"${DESC}\",\"context\":\"AI TDD Tests\"}"
+          STATE="${{ steps.check.outputs.status == 'passed' && 'success' || 'failure' }}"
+          DESC="${{ steps.check.outputs.status == 'passed' && 'all tests passed' || 'some tests failed' }}"
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state="${STATE}" -f description="${DESC}" -f context="AI TDD Tests"
 
       - name: Comment test result on PR
         if: always()
@@ -56,12 +63,16 @@ jobs:
         run: |
           PR_NUMBER=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number // empty')
           if [ -n "$PR_NUMBER" ]; then
-            BODY=$(cat <<'EOF'
-          ## Test Results
-          EOF
-            echo "${BODY}" > /tmp/comment_body.md
-            echo '```' >> /tmp/comment_body.md
-            cat pytest_output.txt >> /tmp/comment_body.md
-            echo '```' >> /tmp/comment_body.md
-            gh pr comment "$PR_NUMBER" --body-file /tmp/comment_body.md
+            BODY="## Test Results\n\`\`\`\n$(cat pytest_output.txt)\n\`\`\`"
+            gh pr comment "$PR_NUMBER" --body "${BODY}"
           fi
+
+      - name: Dispatch rework on failure
+        if: steps.check.outputs.status == 'failed'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          ENCODED=$(cat pytest_output.txt | base64 -w0)
+          gh workflow run rework.yml \
+            -f branch="${{ github.ref_name }}" \
+            -f test_output="${ENCODED}"

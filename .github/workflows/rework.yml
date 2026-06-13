@@ -1,26 +1,27 @@
-name: AI 修改
+name: Rework
 on:
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to fix
+        required: true
+        type: string
+      test_output:
+        description: pytest output from failed run
+        required: true
+        type: string
 
 permissions:
   contents: write
-  issues: write
   pull-requests: write
-  checks: read
 
 jobs:
   rework:
     runs-on: ubuntu-latest
-    if: |
-      github.event.review.state == 'changes_requested'
-      && github.event.review.user.login == github.repository_owner
-      && startsWith(github.event.pull_request.head.ref, 'feat/issue-')
-
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           token: ${{ secrets.PAT_TOKEN }}
 
@@ -30,26 +31,79 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest httpx PyGithub
+        run: pip install -r requirements.txt pytest httpx
 
       - name: Setup opencode
         run: npm install -g @opencode-ai/cli
 
-      - name: Save review body to file
+      - name: Read iteration count from PR
+        id: iteration
         env:
-          REVIEW_BODY: ${{ github.event.review.body }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cat > /tmp/review_body.txt << 'REVIEWEOF'
-          ${{ github.event.review.body }}
-          REVIEWEOF
+          PR_NUMBER=$(gh pr list --head "${{ inputs.branch }}" --json number --jq '.[0].number // empty')
+          if [ -n "$PR_NUMBER" ]; then
+            BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
+            COUNT=$(echo "$BODY" | grep -oP 'AI Rework Iteration: \K\d+' || echo "0")
+            echo "count=$COUNT" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "count=0" >> $GITHUB_OUTPUT
+            echo "pr_number=" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Apply review changes
+      - name: Check iteration limit
+        if: steps.iteration.outputs.count >= 10
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
-          ISSUE_URL: ${{ github.event.pull_request.html_url }}
-          REPO: ${{ github.repository }}
-          TDD_MODE: rework
-          MAX_ITERATIONS: 5
-          TIMEOUT_MINUTES: 20
-        run: python scripts/tdd_loop.py
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.iteration.outputs.pr_number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body "## 已达最大迭代次数\n\nAI 已尝试 10 次修复仍未通过测试，需人工介入。"
+          fi
+          echo "Max rework iterations reached"
+          exit 1
+
+      - name: Save test output for opencode
+        run: |
+          echo "${{ inputs.test_output }}" | base64 -d > /tmp/test_output.txt
+
+      - name: Run opencode to fix
+        run: |
+          opencode run \
+            --goal "The tests are failing. Read the test output at /tmp/test_output.txt and fix the code in app/ to make all tests pass. Do NOT modify test files. Do NOT modify .github/workflows files." \
+            --context "file:///tmp/test_output.txt"
+
+      - name: Commit and push
+        run: |
+          git config user.name "gh-ai-workflow[bot]"
+          git config user.email "gh-ai-workflow[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: rework for ${{ inputs.branch }}" --allow-empty
+          git push origin "${{ inputs.branch }}"
+
+      - name: Increment iteration count in PR body
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.iteration.outputs.pr_number }}
+          ITERATION: ${{ steps.iteration.outputs.count }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            NEW_COUNT=$((ITERATION + 1))
+            gh pr view "$PR_NUMBER" --json body --jq '.body' | \
+              sed "s/AI Rework Iteration: [0-9]*/AI Rework Iteration: ${NEW_COUNT}/" > /tmp/new_body.txt
+            if ! grep -q "AI Rework Iteration" /tmp/new_body.txt; then
+              echo -e "\n---\nAI Rework Iteration: ${NEW_COUNT}" >> /tmp/new_body.txt
+            fi
+            BODY=$(cat /tmp/new_body.txt)
+            gh pr edit "$PR_NUMBER" --body "${BODY}"
+          fi
+
+      - name: Notify test run started
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.iteration.outputs.pr_number }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr comment "$PR_NUMBER" --body "## Rework 完成\n\n代码已修复并推送，等待测试结果..."
+          fi
