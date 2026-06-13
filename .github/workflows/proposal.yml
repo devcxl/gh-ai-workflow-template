@@ -31,8 +31,7 @@ jobs:
           HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
-          opencode run "你是一个资深架构师。请分析 Issue #${ISSUE_NUMBER} 的功能请求，并生成详细的实现方案。步骤：1. 读取 Issue #${ISSUE_NUMBER} 的内容理解需求。2. 检查现有的 app/ 和 tests/ 代码了解项目结构。3. 生成实现方案包含需求分析、技术方案与变更清单、需要修改/新增的文件、测试策略。4. 将方案作为 comment 回复到 Issue 中。方案用中文回复。" \
-            --context "issue:${ISSUE_URL}" \
-            --write-comment
+          opencode run "你是一个资深架构师。请分析 Issue #${ISSUE_NUMBER} 的功能请求，并生成详细的实现方案。步骤：1. 读取 Issue #${ISSUE_NUMBER} 的内容理解需求。2. 检查现有的 app/ 和 tests/ 代码了解项目结构。3. 生成实现方案包含需求分析、技术方案与变更清单、需要修改/新增的文件、测试策略。方案用中文回复。" \
+            -f "${{ github.event.issue.html_url }}" \
+            | gh issue comment "${{ github.event.issue.number }}" --body-file -

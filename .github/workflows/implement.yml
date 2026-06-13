@@ -43,10 +43,9 @@ jobs:
         env:
           HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
           opencode run "You are implementing Issue #${ISSUE_NUMBER}. Read the issue and existing codebase. Write tests in tests/ using pytest + TestClient, then implement the feature in app/ to make all tests pass. Do NOT modify .github/workflows files." \
-            --context "issue:${ISSUE_URL}"
+            -f "${{ github.event.issue.html_url }}"
 
       - name: Commit and push
         env:
