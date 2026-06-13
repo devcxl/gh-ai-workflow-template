@@ -23,11 +23,11 @@ jobs:
           persist-credentials: false
       - name: Post plan to issue
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          HALF_CABBAGE_API_KEY: ${{ secrets.HALF_CABBAGE_API_KEY }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         uses: anomalyco/opencode/github@latest
         with:
-          model: opencode-go/deepseek-v4-flash
+          model: half-cabbage/deepseek-v4-flash
           prompt: |
             你是一个资深架构师。
             请分析 Issue 中的功能请求。
